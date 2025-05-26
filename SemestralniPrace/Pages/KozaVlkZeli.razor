@@ -1,0 +1,54 @@
+﻿@page "/kozaVlkZeli"
+@using SemestralniPrace.Models
+
+@code {
+    private Hra hra = new();
+
+    private string LodAnimacniTrida => hra.AktualniStav.NaLevemBrehu ? "lod-levy" : "lod-pravy";
+
+    private void Vybrat(Polozka p) => hra.VybratPolozku(p);
+
+    private async Task PresunoutAsync()
+    {
+        // Spustí animaci (čekání pro CSS transition)
+        await Task.Delay(100);
+        hra.Presunout();
+    }
+
+    private void Restartuj() => hra = new();
+}
+
+<link href="css/HraKozaVlkZeli.css" rel="stylesheet" />
+
+<div class="nadpis">
+    <h1>River Crossing Challenge - Level 1</h1>
+    <p>Click the characters to put them in the boat then click the boat to cross the river</p>
+</div>
+
+<div class="scena">
+    <div class="breh levy">
+        @foreach (var p in hra.AktualniStav.LevyBreh)
+        {
+            <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
+        }
+    </div>
+
+    <div class="reka">
+        <div class="lod @LodAnimacniTrida" @onclick="PresunoutAsync">
+            @foreach (var p in hra.AktualniStav.Lod)
+            {
+                <img src="@p.Obrazek" class="postava" />
+            }
+        </div>
+    </div>
+
+    <div class="breh pravy">
+        @foreach (var p in hra.AktualniStav.PravyBreh)
+        {
+            <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
+        }
+    </div>
+</div>
+
+<p class="zprava">@hra.Zprava</p>
+<button class="btn-restart" @onclick="Restartuj">Start Again</button>
