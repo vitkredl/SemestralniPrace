@@ -1,54 +1,112 @@
 ﻿@page "/kozaVlkZeli"
 @using SemestralniPrace.Models
-
-@code {
-    private Hra hra = new();
-
-    private string LodAnimacniTrida => hra.AktualniStav.NaLevemBrehu ? "lod-levy" : "lod-pravy";
-
-    private void Vybrat(Polozka p) => hra.VybratPolozku(p);
-
-    private async Task PresunoutAsync()
-    {
-        // Spustí animaci (čekání pro CSS transition)
-        await Task.Delay(100);
-        hra.Presunout();
-    }
-
-    private void Restartuj() => hra = new();
-}
+@using Po1450_Klikacka.Models
 
 <link href="css/HraKozaVlkZeli.css" rel="stylesheet" />
 
-<div class="nadpis">
-    <h1>River Crossing Challenge - Level 1</h1>
-    <p>Click the characters to put them in the boat then click the boat to cross the river</p>
-</div>
+<div class="container mt-4">
+    <h3 class="text-center">Úloha: Převeď kozu, vlka a zelí přes řeku</h3>
+    <p class="text-center">Klikni na postavu pro její přesun na loď a klikni na loď pro převoz.</p>
 
-<div class="scena">
-    <div class="breh levy">
-        @foreach (var p in hra.AktualniStav.LevyBreh)
-        {
-            <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
-        }
-    </div>
-
-    <div class="reka">
-        <div class="lod @LodAnimacniTrida" @onclick="PresunoutAsync">
-            @foreach (var p in hra.AktualniStav.Lod)
+    <div class="scena">
+        <div class="breh">
+            @foreach (var p in hra.AktualniStav.LevyBreh)
             {
-                <img src="@p.Obrazek" class="postava" />
+                <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
+            }
+        </div>
+
+        <div class="reka">
+            <div class="lod @(hra.AktualniStav.JeNaLevemBrehu ? "lod-levy" : "lod-pravy")" @onclick="Presunout">
+                @foreach (var p in hra.AktualniStav.Lod)
+                {
+                    <img src="@p.Obrazek" class="postava" />
+                }
+            </div>
+        </div>
+
+        <div class="breh">
+            @foreach (var p in hra.AktualniStav.PravyBreh)
+            {
+                <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
             }
         </div>
     </div>
 
-    <div class="breh pravy">
-        @foreach (var p in hra.AktualniStav.PravyBreh)
+    @if (!string.IsNullOrEmpty(hra.Zprava))
+    {
+        var alertClass = hra.Zprava.StartsWith("Chyba") ? "alert-danger" :
+        hra.Zprava.StartsWith("Gratulace") ? "alert-success" : "alert-info";
+
+        <div class="alert @alertClass mt-3" role="alert">
+            @hra.Zprava
+        </div>
+    }
+
+    <div class="graf-bodky mb-3">
+        @for (int i = 0; i < graf.Count; i++)
         {
-            <img src="@p.Obrazek" class="postava" @onclick="() => Vybrat(p)" />
+            var barva = graf[i] ? "spravny" : "chybny";
+            var aktivni = i == grafIndex ? "aktivni" : "";
+
+            <span class="bodka @barva @aktivni"></span>
         }
     </div>
+
+    @if (hra.Zprava.StartsWith("Chyba") || hra.Zprava.StartsWith("Gratulace"))
+    {
+        <button class="btn btn-primary" @onclick="Restartuj">Restart</button>
+    }
 </div>
 
-<p class="zprava">@hra.Zprava</p>
-<button class="btn-restart" @onclick="Restartuj">Start Again</button>
+@code {
+    private Hra hra = new();
+    private List<ZaznamKroku> zaznamy = new();
+    private int aktualniIndex = -1;
+    private List<bool> graf = new();
+    private int grafIndex = -1;
+
+    private void Vybrat(Polozka p)
+    {
+        hra.VybratPolozku(p);
+    }
+
+    private void Presunout()
+    {
+        var popisPred = StavPopis(hra.AktualniStav);
+
+        hra.Presunout(zaznam =>
+        {
+            graf.Add(zaznam);
+            grafIndex = graf.Count - 1;
+        });
+
+        if (hra.Zprava.StartsWith("Chyba")) return;
+
+        var kopie = hra.AktualniStav.Kopie();
+        zaznamy.Add(new ZaznamKroku(popisPred, kopie));
+        aktualniIndex = zaznamy.Count - 1;
+
+        if (hra.Zprava.StartsWith("Gratulace"))
+        {
+            graf.Clear();
+            grafIndex = -1;
+        }
+    }
+
+    private void Restartuj()
+    {
+        hra.Restartuj();
+        zaznamy.Clear();
+        aktualniIndex = -1;
+        graf.Clear();
+        grafIndex = -1;
+    }
+
+    private string StavPopis(Stav stav)
+    {
+        string breh = stav.JeNaLevemBrehu ? "levý" : "pravý";
+        string lodObsah = string.Join(", ", stav.Lod.Select(p => p.Nazev));
+        return $"Lod je na {breh}m břehu s: {lodObsah}";
+    }
+}

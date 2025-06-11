@@ -1,12 +1,12 @@
-﻿namespace SemestralniPrace.Models
+﻿namespace Po1450_Klikacka.Models
 {
     public class Hra
     {
         public Stav AktualniStav { get; private set; }
-        public List<ZaznamKroku> Historie { get; private set; } = new();
-        public string Zprava { get; private set; } = string.Empty;
+        public string Zprava { get; private set; } = "";
+        private bool konecna = false;
 
-        private Polozka? vybrana;
+        public bool JeKonecna() => konecna;
 
         private List<Polozka> vsechny = new()
         {
@@ -18,59 +18,95 @@
 
         public Hra()
         {
+            AktualniStav = new Stav();
+            Restartuj();
+        }
+
+        public void Restartuj()
+        {
             AktualniStav = new Stav
             {
-                LevyBreh = vsechny.ToList()
+                LevyBreh = new List<Polozka>(vsechny),
+                JeNaLevemBrehu = true
             };
-
-            Historie.Add(new ZaznamKroku("Start", AktualniStav.Kopie()));
+            AktualniStav.Lod.Clear();
+            Zprava = "";
+            konecna = false;
         }
 
         public void VybratPolozku(Polozka polozka)
         {
-            if (AktualniStav.Lod.Contains(polozka))
+            if (konecna) return;
+
+           if (AktualniStav.Lod.Contains(polozka))
+            {
                 AktualniStav.Lod.Remove(polozka);
-            else if (AktualniStav.NaLevemBrehu && AktualniStav.LevyBreh.Contains(polozka))
+                return;
+            }
+           
+            bool jePrevoznik = polozka.Nazev == "prevoznik";
+            
+            if (AktualniStav.Lod.Count >= 2)
+                return;
+            
+            if (!jePrevoznik && AktualniStav.Lod.Any(p => p.Nazev != "prevoznik"))
+                return;
+            
+            if (jePrevoznik && AktualniStav.Lod.Any(p => p.Nazev == "prevoznik"))
+                return;
+          
+            if (AktualniStav.JeNaLevemBrehu && AktualniStav.LevyBreh.Contains(polozka))
                 AktualniStav.Lod.Add(polozka);
-            else if (!AktualniStav.NaLevemBrehu && AktualniStav.PravyBreh.Contains(polozka))
+            else if (!AktualniStav.JeNaLevemBrehu && AktualniStav.PravyBreh.Contains(polozka))
                 AktualniStav.Lod.Add(polozka);
         }
 
-        public void Presunout()
+        public void Presunout(Action<bool>? zaznamGrafu = null)
         {
+            if (konecna) return;
+
             if (!AktualniStav.Lod.Any(p => p.Nazev == "prevoznik"))
             {
-                Zprava = "Prevoznik musi byt na lodi!";
+                Zprava = "Převozník musí být v loďce!";
+                zaznamGrafu?.Invoke(false);
+                return;
+            }
+            
+            int pocetVeci = AktualniStav.Lod.Count(p => p.Nazev != "prevoznik");
+            if (pocetVeci > 1)
+            {
+                Zprava = "Převozník může převézt jen jednu věc!";
+                zaznamGrafu?.Invoke(false);
                 return;
             }
 
-            // Presun
-            if (AktualniStav.NaLevemBrehu)
-            {
-                foreach (var p in AktualniStav.Lod)
-                    AktualniStav.LevyBreh.Remove(p);
-                AktualniStav.PravyBreh.AddRange(AktualniStav.Lod);
-            }
-            else
-            {
-                foreach (var p in AktualniStav.Lod)
-                    AktualniStav.PravyBreh.Remove(p);
-                AktualniStav.LevyBreh.AddRange(AktualniStav.Lod);
-            }
+            List<Polozka> zdroj = AktualniStav.JeNaLevemBrehu ? AktualniStav.LevyBreh : AktualniStav.PravyBreh;
+            List<Polozka> cil = AktualniStav.JeNaLevemBrehu ? AktualniStav.PravyBreh : AktualniStav.LevyBreh;
 
-            AktualniStav.NaLevemBrehu = !AktualniStav.NaLevemBrehu;
-            var novaKopie = AktualniStav.Kopie();
-            Historie.Add(new ZaznamKroku("Presun", novaKopie));
-            Zprava = "";
+            foreach (var p in AktualniStav.Lod)
+                zdroj.Remove(p);
 
-            // Kontrola pravidel
-            if (JeChybnyStav())
+            cil.AddRange(AktualniStav.Lod);
+            AktualniStav.JeNaLevemBrehu = !AktualniStav.JeNaLevemBrehu;
+
+            bool chybny = JeChybnyStav();
+
+            if (chybny)
             {
-                Zprava = "Chyba! Vlk nesmí být s kozou bez prevoznika, nebo koza se zelím!";
+                Zprava = "Chyba! Vlk a koza nebo koza a zelí bez převozníka!";
+                konecna = true;
+                zaznamGrafu?.Invoke(false);
             }
             else if (AktualniStav.PravyBreh.Count == 4)
             {
-                Zprava = "Gratulujeme! Vyřešeno.";
+                Zprava = "Gratulace! Vyřešeno!";
+                konecna = true;
+                zaznamGrafu?.Invoke(true);
+            }
+            else
+            {
+                Zprava = "";
+                zaznamGrafu?.Invoke(true);
             }
 
             AktualniStav.Lod.Clear();
@@ -78,20 +114,18 @@
 
         private bool JeChybnyStav()
         {
-            var breh = AktualniStav.NaLevemBrehu ? AktualniStav.PravyBreh : AktualniStav.LevyBreh;
-            bool jeTamPrevoznik = breh.Any(p => p.Nazev == "prevoznik");
+            var breh = AktualniStav.JeNaLevemBrehu ? AktualniStav.PravyBreh : AktualniStav.LevyBreh;
+            bool jePrevoznik = breh.Any(p => p.Nazev == "prevoznik");
 
-            if (!jeTamPrevoznik)
-            {
-                bool jeKoza = breh.Any(p => p.Nazev == "koza");
-                bool jeVlk = breh.Any(p => p.Nazev == "vlk");
-                bool jeZeli = breh.Any(p => p.Nazev == "zeli");
+            if (jePrevoznik) return false;
 
-                if ((jeKoza && jeVlk) || (jeKoza && jeZeli))
-                    return true;
-            }
+            bool jeKoza = breh.Any(p => p.Nazev == "koza");
+            bool jeVlk = breh.Any(p => p.Nazev == "vlk");
+            bool jeZeli = breh.Any(p => p.Nazev == "zeli");
 
-            return false;
+            return (jeKoza && jeVlk) || (jeKoza && jeZeli);
         }
     }
 }
+
+

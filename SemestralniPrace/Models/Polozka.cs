@@ -1,4 +1,4 @@
-﻿namespace SemestralniPrace.Models
+﻿namespace Po1450_Klikacka.Models
 {
     public class Polozka
     {
